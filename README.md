@@ -1,2 +1,6 @@
 # NPA
-python Implementation of NPA algorithm
+Python Implementation of NPA algorithm
+
+# Directions for use
+
+Simply use the 
