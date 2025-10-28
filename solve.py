@@ -169,8 +169,8 @@ if __name__ == '__main__':
 
     # Define the Bell functional's coefficients as a dictionary.
     # This example is for the CHSH inequality: + A1*B1 + A1*B2 + A2*B1 - A2*B2
-    CHSH = "(A1 + A2)*B1 + (A1 - A2)*B2"
-    objective_coeffs = parse_bell_functional_sympy(CHSH)
+    bell_functional = "(A1 + A2)*B1 + (A1 - A2)*B2"
+    objective_coeffs = parse_bell_functional_sympy(bell_functional)
     
     # Define the NPA hierarchy level to solve for.
     # '1+AB' is a common level that is sufficient for the CHSH inequality.
