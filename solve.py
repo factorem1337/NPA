@@ -4,6 +4,78 @@ import cvxpy as cp
 # Import the blueprint generator from the npa.py file you provided
 from npa import npa_hierarchy_intermediate
 
+def parse_bell_functional_sympy(functional_str, base_operators):
+    """
+    Parses a user-entered algebraic string for a Bell functional into a 
+    coefficient dictionary using sympy for symbolic expansion.
+    Example: "(A1+A2)*B1" -> {'A1 B1': 1.0, 'A2 B1': 1.0}
+    """
+    print(f"Parsing functional: {functional_str}")
+    # Define all base operators as non-commuting symbols for sympy
+    symbols_dict = {op: sympy.Symbol(op, commutative=False) for op in base_operators}
+    
+    # Define commutation rules for sympy: A operators commute with B operators
+    for a_op_key in [s for s in base_operators if s.startswith('A')]:
+        for b_op_key in [s for s in base_operators if s.startswith('B')]:
+            a_op_sym = symbols_dict.get(a_op_key)
+            b_op_sym = symbols_dict.get(b_op_key)
+            if a_op_sym is not None and b_op_sym is not None:
+                 # In sympy, modifying commutation requires careful handling.
+                 # Instead, we will rely on canonical sorting after expansion.
+                 pass
+
+    # Parse the user's string into a sympy expression
+    expr = parse_expr(functional_str, local_dict=symbols_dict, evaluate=True)
+    
+    # Expand the expression algebraically, e.g., (A1+A2)*B1 -> A1*B1 + A2*B1
+    expanded_expr = sympy.expand(expr)
+    print(f"Expanded expression: {expanded_expr}")
+    
+    # Convert the expanded expression into a coefficient dictionary
+    objective_coeffs = {}
+    if isinstance(expanded_expr, sympy.Add):
+        terms = expanded_expr.as_ordered_terms()
+    elif expanded_expr == 0:
+        terms = []
+    else:
+        terms = [expanded_expr] # Handle single-term expressions or constants
+
+    for term in terms:
+        coeff, ops_expr = term.as_coeff_Mul()
+        
+        # Convert sympy operators back to strings
+        if ops_expr == 1: # Handle constant terms
+             op_list = ["Id"]
+        else:
+            # Handle single operator terms vs products
+            if isinstance(ops_expr, sympy.Symbol):
+                 op_list = [str(ops_expr)]
+            elif isinstance(ops_expr, sympy.Mul):
+                 op_list = [str(s) for s in ops_expr.args] # Extract operators from Mul
+            else:
+                 print(f"Warning: Unexpected term type in expanded expression: {ops_expr}")
+                 continue # Skip term if it's not understandable
+
+        # Create canonical key by sorting A's then B's (matching npa.py's convention)
+        a_part = sorted([op for op in op_list if op.startswith('A')])
+        b_part = sorted([op for op in op_list if op.startswith('B')])
+        key_parts = a_part + b_part
+        if not key_parts:
+             if "Id" in op_list: key = "Id"
+             else: continue # Skip if term simplifies to zero unexpectedly
+        else:
+            key = " ".join(key_parts)
+        
+        current_coeff = objective_coeffs.get(key, 0.0)
+        objective_coeffs[key] = current_coeff + float(coeff)
+            
+    # Filter out zero coefficients and the Id constant if it's zero
+    objective_coeffs = {k: v for k, v in objective_coeffs.items() if not np.isclose(v, 0)}
+    if "Id" in objective_coeffs and np.isclose(objective_coeffs["Id"],0):
+        del objective_coeffs["Id"]
+            
+    return objective_coeffs
+
 def solve_npa_from_symbolic(symbolic_basis, symbolic_matrix, objective_coeffs):
     """
     Builds and solves a dimension-independent Semidefinite Program (SDP) 
@@ -97,12 +169,8 @@ if __name__ == '__main__':
 
     # Define the Bell functional's coefficients as a dictionary.
     # This example is for the CHSH inequality: + A1*B1 + A1*B2 + A2*B1 - A2*B2
-    objective_coeffs = {
-        "A1 B1": 1,
-        "A1 B2": 1,
-        "A2 B1": 1,
-        "A2 B2": -1
-    }
+    CHSH = "(A1 + A2)*B1 + (A1 - A2)*B2"
+    objective_coeffs = parse_bell_functional_sympy(CHSH)
     
     # Define the NPA hierarchy level to solve for.
     # '1+AB' is a common level that is sufficient for the CHSH inequality.
